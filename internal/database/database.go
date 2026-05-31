@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -45,11 +47,16 @@ func getUser(Pool *pgxpool.Pool, email string) (string, error) {
 func Login(Pool *pgxpool.Pool, email, password string) (bool, error) {
 	passwordHash, err := getUser(Pool, email)
 	if err != nil {
+		fmt.Println("Error getting user:", err)
+		if err == pgx.ErrNoRows {
+			return false, AccountNotFoundError
+		}
 		return false, err
+
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
 	if err != nil {
-		return false, nil
+		return false, InvalidPasswordError
 	}
 	return true, nil
 }

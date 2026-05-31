@@ -15,6 +15,9 @@ type RegisterRequest struct {
 	Password string `json:"password"`
 	Email    string `json:"email"`
 }
+type ErrorResponse struct {
+	Message string `json:"message"`
+}
 
 func main() {
 	err := godotenv.Load()
@@ -53,7 +56,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
-	router.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/api/login", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -67,14 +70,22 @@ func main() {
 		}
 
 		isLoggedIn, err := database.Login(Pool, req.Email, req.Password)
+		fmt.Println("err: ", err)
 		if err != nil {
 			log.Println("Login error:", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			if err == database.AccountNotFoundError || err == database.InvalidPasswordError {
+				fmt.Println("sending 401")
+				sendError(w, http.StatusUnauthorized, "Invalid email or password")
+				return
+			} else {
+				fmt.Println("sending 500")
+				sendError(w, http.StatusInternalServerError, "Internal server error")
+				return
+			}
 		}
 
 		if !isLoggedIn {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			sendError(w, http.StatusUnauthorized, "Invalid email or password")
 			return
 		}
 
@@ -95,5 +106,14 @@ func corsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+func sendError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	json.NewEncoder(w).Encode(ErrorResponse{
+		Message: message,
 	})
 }
