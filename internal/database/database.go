@@ -37,26 +37,27 @@ func AddUser(Pool *pgxpool.Pool, username, password, email string) error {
 	return err
 }
 
-func getUser(Pool *pgxpool.Pool, email string) (string, error) {
+func getUser(Pool *pgxpool.Pool, email string) (int, string, error) {
 	var passwordHash string
+	var id int
 	err := Pool.QueryRow(context.Background(),
-		"SELECT password_hash FROM users WHERE email = $1",
-		email).Scan(&passwordHash)
-	return passwordHash, err
+		"SELECT password_hash, id FROM users WHERE email = $1",
+		email).Scan(&passwordHash, &id)
+	return id, passwordHash, err
 }
-func Login(Pool *pgxpool.Pool, email, password string) (bool, error) {
-	passwordHash, err := getUser(Pool, email)
+func Login(Pool *pgxpool.Pool, email, password string) (int, error) {
+	userID, passwordHash, err := getUser(Pool, email)
 	if err != nil {
 		fmt.Println("Error getting user:", err)
 		if err == pgx.ErrNoRows {
-			return false, AccountNotFoundError
+			return -1, AccountNotFoundError
 		}
-		return false, err
+		return -1, err
 
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
 	if err != nil {
-		return false, InvalidPasswordError
+		return -1, InvalidPasswordError
 	}
-	return true, nil
+	return userID, nil
 }

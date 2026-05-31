@@ -32,7 +32,7 @@ func main() {
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, World!\n"))
 	})
-	router.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/api/register", func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -69,7 +69,7 @@ func main() {
 			return
 		}
 
-		isLoggedIn, err := database.Login(Pool, req.Email, req.Password)
+		userID, err := database.Login(Pool, req.Email, req.Password)
 		fmt.Println("err: ", err)
 		if err != nil {
 			log.Println("Login error:", err)
@@ -84,13 +84,23 @@ func main() {
 			}
 		}
 
-		if !isLoggedIn {
+		if userID == -1 {
 			sendError(w, http.StatusUnauthorized, "Invalid email or password")
 			return
 		}
+		token, err := database.GenerateJWT(userID)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, "Failed to create token")
+			return
+		}
+		response := map[string]string{
+			"status": "logged_in",
+			"token":  token,
+		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"logged_in"}`))
+		json.NewEncoder(w).Encode(response)
 	})
 
 	http.ListenAndServe(":8080", corsMiddleware(router))
