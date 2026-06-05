@@ -3,14 +3,22 @@ package auth
 import (
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"strings"
 
 	"github.com/ethannself/cloud-drive-b/internal/database"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type RegisterRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Email    string `json:"email"`
+}
+type Claims struct {
+	UserID int `json:"user_id"`
+	jwt.RegisteredClaims
 }
 
 func Register(dataStore *database.DataStore, req RegisterRequest) error {
@@ -43,4 +51,22 @@ func Login(dataStore *database.DataStore, req RegisterRequest) (string, error) {
 	}
 
 	return token, nil
+}
+func JWTMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			http.Error(w, "Missing or invalid Authorization header", http.StatusUnauthorized)
+			return
+		}
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		})
+		if err != nil || !token.Valid {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

@@ -6,8 +6,15 @@ import (
 	"net/http"
 
 	"github.com/ethannself/cloud-drive-b/internal/auth"
+	"github.com/ethannself/cloud-drive-b/internal/database"
 	"github.com/ethannself/cloud-drive-b/internal/storage"
+	"github.com/golang-jwt/jwt/v5"
 )
+
+type Claims struct {
+	UserID int `json:"user_id"`
+	jwt.RegisteredClaims
+}
 
 func DefaultHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello, World!\n"))
@@ -56,6 +63,29 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
 		"status": "logged_in",
 		"token":  token,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+func JWTTestHandler(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("Authorization")
+	if token == "" {
+		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := database.ValidateJWT(token)
+	if err != nil {
+		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	response := map[string]interface{}{
+		"status": "token_valid",
+		"userID": userID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

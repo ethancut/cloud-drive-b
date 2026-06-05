@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/ethannself/cloud-drive-b/internal/api/handler"
+	"github.com/ethannself/cloud-drive-b/internal/auth"
 	"github.com/rs/cors"
 )
 
@@ -13,7 +14,14 @@ func New() http.Handler {
 	mux.HandleFunc("/", handler.DefaultHandler)
 	mux.HandleFunc("/api/register", handler.RegisterHandler)
 	mux.HandleFunc("/api/login", handler.LoginHandler)
+	mux.Handle("/api/test-jwt", auth.JWTMiddleware(http.HandlerFunc(handler.JWTTestHandler)))
 
-	router := cors.Default().Handler(mux)
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:4321"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		AllowCredentials: true,
+	})
+	router := c.Handler(mux)
 	return router
 }

@@ -49,6 +49,13 @@ func (ds *DataStore) getUser(email string) (int, string, error) {
 		email).Scan(&passwordHash, &id)
 	return id, passwordHash, err
 }
+func (ds *DataStore) DeleteUser(email string) error {
+	_, err := ds.db.Exec(context.Background(),
+		"DELETE FROM users WHERE email = $1",
+		email)
+	return err
+}
+
 func (ds *DataStore) Login(email, password string) (int, error) {
 	userID, passwordHash, err := ds.getUser(email)
 	if err != nil {
