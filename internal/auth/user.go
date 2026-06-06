@@ -54,6 +54,7 @@ func Login(dataStore *database.DataStore, req RegisterRequest) (string, error) {
 }
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("JWTMiddleware: checking token for request to", r.URL.Path)
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 			http.Error(w, "Missing or invalid Authorization header", http.StatusUnauthorized)
@@ -65,6 +66,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		})
 		if err != nil || !token.Valid {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			log.Println("JWT parse error:", err)
 			return
 		}
 		next.ServeHTTP(w, r)

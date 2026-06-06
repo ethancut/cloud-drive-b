@@ -48,3 +48,7 @@ func ValidateJWT(tokenString string) (int, error) {
 		return -1, err
 	}
 }
+
+func GetUserIDFromToken(tokenString string) (int, error) {
+	return ValidateJWT(tokenString)
+}

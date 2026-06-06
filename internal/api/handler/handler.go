@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/ethannself/cloud-drive-b/internal/auth"
@@ -91,4 +92,28 @@ func JWTTestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+func UploadHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("UploaderHandler: Received upload request")
+
+	err := r.ParseMultipartForm(10 << 20) // 10MB
+	if err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Failed to read file", http.StatusBadRequest)
+		return
+	}
+	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+	storage.UploadFile(userID, fileHeader.Filename, file)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "uploaded"})
 }
