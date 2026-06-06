@@ -21,16 +21,16 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func Register(dataStore *database.DataStore, req RegisterRequest) error {
+func Register(dataStore *database.DataStore, req RegisterRequest) (string, error) {
 	var err error
 	log.Println("user.Register: got credentials:", req.Username, req.Password, req.Email)
 
 	err = dataStore.AddUser(req.Username, req.Password, req.Email)
 	if err != nil {
 		log.Println("Register error:", err)
-		return err
+		return "", err
 	}
-	return nil
+	return Login(dataStore, req)
 }
 
 func Login(dataStore *database.DataStore, req RegisterRequest) (string, error) {
