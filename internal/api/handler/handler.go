@@ -117,3 +117,22 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "uploaded"})
 }
+
+func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
+	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+	files, err := storage.ListFiles(userID)
+	if err != nil {
+		http.Error(w, "Failed to list files", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "ok",
+		"files":  files,
+	})
+}
