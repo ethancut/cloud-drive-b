@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 )
 
 type File struct {
-	Filename string `json:"filename"`
-	Size     int64  `json:"size"`
+	Filename string    `json:"filename"`
+	Size     int64     `json:"size"`
+	ModTime  time.Time `json:"modtime"`
 }
 
 func UploadFile(userID int, filename string, file io.Reader) error {
@@ -36,9 +38,11 @@ func ListFiles(userID int) ([]File, error) {
 			if err != nil {
 				continue
 			}
+
 			files = append(files, File{
 				Filename: entry.Name(),
 				Size:     info.Size(),
+				ModTime:  info.ModTime(),
 			})
 		}
 	}
