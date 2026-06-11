@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -47,4 +48,35 @@ func ListFiles(userID int) ([]File, error) {
 		}
 	}
 	return files, nil
+}
+
+// if successful, returns the absolute path of the file.
+func queryStorage(userID int, fileName string) (string, error) {
+	dir := fmt.Sprintf("%s%d", os.Getenv("UPLOADS_DIR"), userID)
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+
+			if entry.Name() == fileName {
+				absPath := filepath.Join(dir, entry.Name())
+				return absPath, nil
+			}
+
+		}
+	}
+	return "", fmt.Errorf("file %q not found", fileName)
+}
+func DeleteFile(userID int, fileName string) error {
+	path, err := queryStorage(userID, fileName)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	return nil
 }

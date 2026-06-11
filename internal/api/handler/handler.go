@@ -136,3 +136,20 @@ func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
 		"files":  files,
 	})
 }
+func DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
+	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+	filename := r.PathValue("filename")
+	if filename == "" {
+		http.Error(w, "Missing filename", http.StatusBadRequest)
+		return
+	}
+	if err := storage.DeleteFile(userID, filename); err != nil {
+		http.Error(w, "Failed to delete file", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
