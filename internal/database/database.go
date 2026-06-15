@@ -35,19 +35,19 @@ func (ds *DataStore) AddUser(username, password, email string) error {
 		return err
 	}
 	_, err = ds.db.Exec(context.Background(),
-		"INSERT INTO users (password_hash, email) VALUES ($1, $2)",
+		"INSERT INTO users (password_hash, email, username) VALUES ($1, $2, $3)",
 		string(bcryptPassword),
-		email)
+		email, username)
 	return err
 }
 
-func (ds *DataStore) getUser(email string) (int, string, error) {
-	var passwordHash string
+func (ds *DataStore) getUser(email string) (int, string, string, error) {
+	var passwordHash, username string
 	var id int
 	err := ds.db.QueryRow(context.Background(),
-		"SELECT password_hash, id FROM users WHERE email = $1",
-		email).Scan(&passwordHash, &id)
-	return id, passwordHash, err
+		"SELECT password_hash, id, username FROM users WHERE email = $1",
+		email).Scan(&passwordHash, &id, &username)
+	return id, passwordHash, username, err
 }
 func (ds *DataStore) DeleteUser(email string) error {
 	_, err := ds.db.Exec(context.Background(),
@@ -56,21 +56,21 @@ func (ds *DataStore) DeleteUser(email string) error {
 	return err
 }
 
-func (ds *DataStore) Login(email, password string) (int, error) {
-	userID, passwordHash, err := ds.getUser(email)
+func (ds *DataStore) Login(email, password string) (int, string, error) {
+	userID, passwordHash, username, err := ds.getUser(email)
 	if err != nil {
 		fmt.Println("Error getting user:", err)
 		if err == pgx.ErrNoRows {
-			return -1, AccountNotFoundError
+			return -1, "", AccountNotFoundError
 		}
-		return -1, err
+		return -1, "", err
 
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
 	if err != nil {
-		return -1, InvalidPasswordError
+		return -1, "", InvalidPasswordError
 	}
-	return userID, nil
+	return userID, username, nil
 }
 func (ds *DataStore) Close() {
 	ds.db.Close()

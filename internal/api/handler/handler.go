@@ -16,6 +16,11 @@ type Claims struct {
 	UserID int `json:"user_id"`
 	jwt.RegisteredClaims
 }
+type LoginResponse struct {
+	Status   string `json:"status"`
+	Token    string `json:"token"`
+	Username string `json:"username"`
+}
 
 func DefaultHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello, World!\n"))
@@ -33,14 +38,19 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.Register(storage.GetDataStore(), req)
+	token, username, err := auth.Register(storage.GetDataStore(), req)
 	if err != nil {
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok", "token": "` + token + `"}`))
+	response := LoginResponse{
+		Status:   "ok",
+		Token:    token,
+		Username: username,
+	}
+	json.NewEncoder(w).Encode(response)
 }
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req auth.RegisterRequest
@@ -55,17 +65,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("Attempting to login with credentials: ", req.Email, req.Password)
 
-	token, err := auth.Login(storage.GetDataStore(), req)
+	token, username, err := auth.Login(storage.GetDataStore(), req)
 	if err != nil {
 		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
 	}
-
-	response := map[string]string{
-		"status": "logged_in",
-		"token":  token,
+	response := LoginResponse{
+		Status:   "logged_in",
+		Token:    token,
+		Username: username,
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
