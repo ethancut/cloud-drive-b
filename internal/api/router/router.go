@@ -18,6 +18,7 @@ func New() http.Handler {
 	mux.Handle("/api/files/upload", auth.JWTMiddleware(http.HandlerFunc(handler.UploadHandler)))
 	mux.Handle("/api/files/list", auth.JWTMiddleware(http.HandlerFunc(handler.ListFilesHandler)))
 	mux.Handle("/api/files/delete/{filename}", auth.JWTMiddleware(http.HandlerFunc(handler.DeleteFileHandler)))
+	mux.Handle("/api/files/download/{filename}", auth.JWTMiddleware(http.HandlerFunc(handler.DownloadFileHandler)))
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:4321"},

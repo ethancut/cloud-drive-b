@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/ethannself/cloud-drive-b/internal/auth"
 	"github.com/ethannself/cloud-drive-b/internal/database"
@@ -161,4 +165,44 @@ func DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+	filename := r.PathValue("filename")
+	if filename == "" {
+		http.Error(w, "Missing filename", http.StatusBadRequest)
+		return
+	}
+	filePath := filepath.Join("uploads", strconv.Itoa(userID), filename)
+
+	cleanPath := filepath.Clean(filePath)
+
+	if !strings.HasPrefix(cleanPath, filepath.Join("uploads", strconv.Itoa(userID))) {
+		http.Error(w, "invalid file path", http.StatusBadRequest)
+		return
+	}
+
+	file, err := os.Open(cleanPath)
+	if err != nil {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		http.Error(w, "could not stat file", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
+
+	http.ServeContent(w, r, filename, stat.ModTime(), file)
 }
