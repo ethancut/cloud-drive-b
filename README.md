@@ -4,7 +4,7 @@ A personal Google Drive-style cloud storage app built to explore how file storag
 
 ## Tech Stack
 
-**Frontend**
+**[Frontend](https://github.com/ethancut/cloud-drive-f)**
 - [Astro](https://astro.build/)
 
 **Backend**
