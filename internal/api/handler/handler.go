@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,19 +10,14 @@ import (
 	"strings"
 
 	"github.com/ethannself/cloud-drive-b/internal/auth"
-	"github.com/ethannself/cloud-drive-b/internal/database"
 	"github.com/ethannself/cloud-drive-b/internal/storage"
-	"github.com/golang-jwt/jwt/v5"
 )
 
-type Claims struct {
-	UserID int `json:"user_id"`
-	jwt.RegisteredClaims
-}
-type LoginResponse struct {
-	Status   string `json:"status"`
-	Token    string `json:"token"`
-	Username string `json:"username"`
+type AuthResponse struct {
+	Status       string `json:"status"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Username     string `json:"username,omitempty"`
 }
 
 func DefaultHandler(w http.ResponseWriter, r *http.Request) {
@@ -42,17 +36,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, username, err := auth.Register(storage.GetDataStore(), req)
+	tokens, username, err := auth.Register(storage.GetDataStore(), req)
 	if err != nil {
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	response := LoginResponse{
-		Status:   "ok",
-		Token:    token,
-		Username: username,
+	response := AuthResponse{
+		Status:       "ok",
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		Username:     username,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -69,45 +64,41 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("Attempting to login with credentials: ", req.Email, req.Password)
 
-	token, username, err := auth.Login(storage.GetDataStore(), req)
+	tokens, username, err := auth.Login(storage.GetDataStore(), req)
 	if err != nil {
 		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
 	}
-	response := LoginResponse{
-		Status:   "logged_in",
-		Token:    token,
-		Username: username,
-	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(AuthResponse{
+		Status:       "logged_in",
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		Username:     username,
+	})
 }
 
 func JWTTestHandler(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("Authorization")
-	if token == "" {
-		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
-	}
-
-	userID, err := database.ValidateJWT(token)
-	if err != nil {
-		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	response := map[string]interface{}{
-		"status": "token_valid",
-		"userID": userID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "token_valid",
+		"userID": userID,
+	})
 }
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("UploaderHandler: Received upload request")
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	err := r.ParseMultipartForm(10 << 20) // 10MB
 	if err != nil {
@@ -119,11 +110,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to read file", http.StatusBadRequest)
 		return
 	}
-	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return
-	}
+	defer file.Close()
+
 	storage.UploadFile(userID, fileHeader.Filename, file)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -132,9 +120,9 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
-	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	files, err := storage.ListFiles(userID)
@@ -150,9 +138,9 @@ func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 func DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
-	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	filename := r.PathValue("filename")
@@ -168,9 +156,9 @@ func DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
-	userID, err := database.GetUserIDFromToken(r.Header.Get("Authorization"))
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	filename := r.PathValue("filename")
@@ -178,11 +166,10 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing filename", http.StatusBadRequest)
 		return
 	}
-	filePath := filepath.Join("uploads", strconv.Itoa(userID), filename)
+	baseDir := filepath.Join("uploads", strconv.Itoa(userID))
+	cleanPath := filepath.Clean(filepath.Join(baseDir, filename))
 
-	cleanPath := filepath.Clean(filePath)
-
-	if !strings.HasPrefix(cleanPath, filepath.Join("uploads", strconv.Itoa(userID))) {
+	if !strings.HasPrefix(cleanPath, baseDir) {
 		http.Error(w, "invalid file path", http.StatusBadRequest)
 		return
 	}

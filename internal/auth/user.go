@@ -1,74 +1,75 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/ethannself/cloud-drive-b/internal/database"
-	"github.com/golang-jwt/jwt/v5"
 )
+
+type contextKey string
+
+const UserIDContextKey contextKey = "userID"
 
 type RegisterRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Email    string `json:"email"`
 }
-type Claims struct {
-	UserID int `json:"user_id"`
-	jwt.RegisteredClaims
-}
 
-func Register(dataStore *database.DataStore, req RegisterRequest) (token string, username string, e error) {
+func Register(dataStore *database.DataStore, req RegisterRequest) (*database.TokenPair, string, error) {
 	var err error
 	log.Println("user.Register: got credentials:", req.Username, req.Password, req.Email)
 
 	err = dataStore.AddUser(req.Username, req.Password, req.Email)
 	if err != nil {
 		log.Println("Register error:", err)
-		return "", "", err
+		return nil, "", err
 	}
 	return Login(dataStore, req)
 }
 
-func Login(dataStore *database.DataStore, req RegisterRequest) (string, string, error) {
+func Login(dataStore *database.DataStore, req RegisterRequest) (*database.TokenPair, string, error) {
 	userID, username, err := dataStore.Login(req.Email, req.Password)
 	if err != nil {
 		log.Println("Login error:", err)
-		return "", "", err
+		return nil, "", err
 	}
 	if userID == -1 {
 		log.Println("Login error: invalid credentials")
-		return "", "", fmt.Errorf("invalid credentials")
+		return nil, "", fmt.Errorf("invalid credentials")
 	}
 
-	token, err := database.GenerateJWT(userID)
+	tokens, err := database.GenerateTokenPair(userID)
 	if err != nil {
 		log.Println("JWT generation error:", err)
-		return "", "", err
+		return nil, "", err
 	}
 
-	return token, username, nil
+	return tokens, username, nil
 }
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("JWTMiddleware: checking token for request to", r.URL.Path)
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, "Missing or invalid Authorization header", http.StatusUnauthorized)
+		if authHeader == "" {
+			http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 			return
 		}
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-			return []byte(os.Getenv("JWT_SECRET")), nil
-		})
-		if err != nil || !token.Valid {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			log.Println("JWT parse error:", err)
+		userID, err := database.ValidateAccessToken(authHeader)
+		if err != nil {
+			log.Println("Access Token Validation Error:", err)
+			http.Error(w, "Unauthorized "+err.Error(), http.StatusUnauthorized)
 			return
 		}
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), UserIDContextKey, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func GetUserIDFromContext(ctx context.Context) (int, bool) {
+	userID, ok := ctx.Value(UserIDContextKey).(int)
+	return userID, ok
 }
