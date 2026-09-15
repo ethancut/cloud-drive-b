@@ -21,7 +21,7 @@ func New() http.Handler {
 	mux.Handle("/api/files/download/{filename}", auth.JWTMiddleware(http.HandlerFunc(handler.DownloadFileHandler)))
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:4321"},
+		AllowedOrigins:   []string{"https://cloud.ethann.stream", "http://localhost:4321"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
