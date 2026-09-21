@@ -88,9 +88,40 @@ func ValidateAccessToken(authHeader string) (int, error) {
 
 	return claims.UserID, nil
 }
+func RefreshAccessToken(authHeader string) (*TokenPair, error) {
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return nil, errors.New("missing or invalid Bearer token prefix")
+	}
+	refreshTokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
+	claims, err := parseToken(refreshTokenString, os.Getenv("JWT_SECRET"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	if claims.Type != TokenTypeRefresh {
+		return nil, errors.New("invalid token type: expected refresh token")
+	}
+	accessClaims := Claims{
+		UserID: claims.UserID,
+		Type:   TokenTypeAccess,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(AccessTokenExpiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %v", err)
+	}
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshTokenString,
+	}, nil
+}
 func RefreshTokens(refreshTokenString string) (*TokenPair, error) {
-	claims, err := parseToken(refreshTokenString, os.Getenv("JWT_REFRESH_SECRET"))
+	claims, err := parseToken(refreshTokenString, os.Getenv("JWT_SECRET"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid refresh token: %w", err)
 	}

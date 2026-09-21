@@ -3,6 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ethannself/cloud-drive-b/internal/auth"
+	"github.com/ethannself/cloud-drive-b/internal/database"
 	"github.com/ethannself/cloud-drive-b/internal/storage"
 )
 
@@ -31,14 +34,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad JSON", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" || req.Password == "" || req.Email == "" {
+	if req.Username == "" || req.Password == "" || req.Email == "" || req.RegistrationKey == "" {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
 	tokens, username, err := auth.Register(storage.GetDataStore(), req)
 	if err != nil {
-		http.Error(w, "Failed to register user", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -203,4 +206,25 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
 
 	http.ServeContent(w, r, filename, stat.ModTime(), file)
+}
+func RefreshTokenhandler(w http.ResponseWriter, r *http.Request) {
+
+	authHeader := r.Header.Get("Authorization")
+	log.Println("auth: ", authHeader)
+	if authHeader == "" {
+		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+		return
+	}
+	newTokens, err := database.RefreshAccessToken(authHeader)
+	if err != nil {
+		http.Error(w, "Failed to refresh token: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(AuthResponse{
+		Status:       "token_refreshed",
+		AccessToken:  newTokens.AccessToken,
+		RefreshToken: newTokens.RefreshToken,
+	})
 }

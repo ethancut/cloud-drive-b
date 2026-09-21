@@ -5,23 +5,31 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/ethannself/cloud-drive-b/internal/database"
 )
 
 type contextKey string
+type InvalidRegistrationKeyError error
 
 const UserIDContextKey contextKey = "userID"
 
 type RegisterRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Username        string `json:"username"`
+	Password        string `json:"password"`
+	Email           string `json:"email"`
+	RegistrationKey string `json:"registration_key"`
 }
 
 func Register(dataStore *database.DataStore, req RegisterRequest) (*database.TokenPair, string, error) {
 	var err error
-	log.Println("user.Register: got credentials:", req.Username, req.Password, req.Email)
+	log.Printf("user.Register: got credentials: username: %s, email: %s, registration_key: %s", req.Username, req.Email, req.RegistrationKey)
+
+	if req.RegistrationKey != os.Getenv("REGISTRATION_KEY") {
+		log.Println("Register error: invalid registration key")
+		return nil, "", fmt.Errorf("invalid registration key")
+	}
 
 	err = dataStore.AddUser(req.Username, req.Password, req.Email)
 	if err != nil {

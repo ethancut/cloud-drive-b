@@ -19,6 +19,7 @@ func New() http.Handler {
 	mux.Handle("/api/files/list", auth.JWTMiddleware(http.HandlerFunc(handler.ListFilesHandler)))
 	mux.Handle("/api/files/delete/{filename}", auth.JWTMiddleware(http.HandlerFunc(handler.DeleteFileHandler)))
 	mux.Handle("/api/files/download/{filename}", auth.JWTMiddleware(http.HandlerFunc(handler.DownloadFileHandler)))
+	mux.Handle("/api/auth/refresh", http.HandlerFunc(handler.RefreshTokenhandler))
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"https://cloud.ethann.stream", "http://localhost:4321"},
