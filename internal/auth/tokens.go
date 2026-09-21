@@ -29,14 +29,21 @@ const (
 	TokenTypeRefresh TokenType = "refresh"
 )
 
-// helper function that gets the claims from the authHeader and returns it
-func getClaimsFromAuthHeader(authHeader string) (*Claims, error) {
-	claims, err := parseToken(authHeader, os.Getenv("JWT_SECRET"))
-	if err != nil {
-		return nil, err
-	}
+type TokenService struct {
+	secretKey          []byte
+	accessTokenExpiry  time.Duration
+	refreshTokenExpiry time.Duration
+}
 
-	return claims, nil
+func NewTokenService(secretKey string, accessTokenExpiry, refreshTokenExpiry time.Duration) (*TokenService, error) {
+	if strings.TrimSpace(secretKey) == "" {
+		return nil, ErrEmptySecret
+	}
+	return &TokenService{
+		secretKey:          []byte(secretKey),
+		accessTokenExpiry:  accessTokenExpiry,
+		refreshTokenExpiry: refreshTokenExpiry,
+	}, nil
 }
 
 func ValidateAccessToken(authHeader string) (int, error) {

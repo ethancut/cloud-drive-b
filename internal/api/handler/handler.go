@@ -20,12 +20,19 @@ type AuthResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	Username     string `json:"username,omitempty"`
 }
+type Handler struct {
+	TokenService *auth.TokenService
+}
+
+func NewHandler(ts *auth.TokenService) *Handler {
+	return &Handler{TokenService: ts}
+}
 
 func DefaultHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello, World!\n"))
 }
 
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var req auth.RegisterRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -37,7 +44,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, username, err := auth.Register(storage.GetDataStore(), req)
+	tokens, username, err := auth.Register(h.TokenService, storage.GetDataStore(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -52,7 +59,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(response)
 }
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req auth.RegisterRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -65,7 +72,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("Attempting to login with credentials: ", req.Email, req.Password)
 
-	tokens, username, err := auth.Login(storage.GetDataStore(), req)
+	tokens, username, err := auth.Login(h.TokenService, storage.GetDataStore(), req)
 	if err != nil {
 		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
@@ -80,7 +87,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func JWTTestHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) JWTTestHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -94,7 +101,7 @@ func JWTTestHandler(w http.ResponseWriter, r *http.Request) {
 		"userID": userID,
 	})
 }
-func UploadHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -120,7 +127,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "uploaded"})
 }
 
-func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListFilesHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -138,7 +145,7 @@ func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
 		"files":  files,
 	})
 }
-func DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -156,7 +163,7 @@ func DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -205,14 +212,14 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.ServeContent(w, r, filename, stat.ModTime(), file)
 }
-func RefreshTokenhandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RefreshTokenhandler(w http.ResponseWriter, r *http.Request) {
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 		return
 	}
-	newTokens, err := auth.RefreshAccessToken(authHeader)
+	newTokens, _, err := h.TokenService.RotateRefreshToken(authHeader)
 	if err != nil {
 		http.Error(w, "Failed to refresh token: "+err.Error(), http.StatusUnauthorized)
 		return

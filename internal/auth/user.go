@@ -22,9 +22,8 @@ type RegisterRequest struct {
 	RegistrationKey string `json:"registration_key"`
 }
 
-func Register(dataStore *database.DataStore, req RegisterRequest) (*TokenPair, string, error) {
+func Register(ts *TokenService, dataStore *database.DataStore, req RegisterRequest) (*TokenPair, string, error) {
 	var err error
-	log.Printf("user.Register: got credentials: username: %s, email: %s, registration_key: %s", req.Username, req.Email, req.RegistrationKey)
 
 	if req.RegistrationKey != os.Getenv("REGISTRATION_KEY") {
 		log.Println("Register error: invalid registration key")
@@ -36,10 +35,10 @@ func Register(dataStore *database.DataStore, req RegisterRequest) (*TokenPair, s
 		log.Println("Register error:", err)
 		return nil, "", err
 	}
-	return Login(dataStore, req)
+	return Login(ts, dataStore, req)
 }
 
-func Login(dataStore *database.DataStore, req RegisterRequest) (*TokenPair, string, error) {
+func Login(ts *TokenService, dataStore *database.DataStore, req RegisterRequest) (*TokenPair, string, error) {
 	userID, username, err := dataStore.Login(req.Email, req.Password)
 	if err != nil {
 		log.Println("Login error:", err)
@@ -50,7 +49,7 @@ func Login(dataStore *database.DataStore, req RegisterRequest) (*TokenPair, stri
 		return nil, "", fmt.Errorf("invalid credentials")
 	}
 
-	tokens, err := GenerateTokenPair(userID)
+	tokens, err := ts.GenerateTokenPair(userID)
 	if err != nil {
 		log.Println("JWT generation error:", err)
 		return nil, "", err
@@ -58,7 +57,7 @@ func Login(dataStore *database.DataStore, req RegisterRequest) (*TokenPair, stri
 
 	return tokens, username, nil
 }
-func JWTMiddleware(next http.Handler) http.Handler {
+func JWTMiddleware(ts *TokenService, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("JWTMiddleware: checking token for request to", r.URL.Path)
 		authHeader := r.Header.Get("Authorization")
@@ -66,7 +65,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 			return
 		}
-		userID, err := ValidateAccessToken(authHeader)
+		userID, err := ts.ValidateAccessToken(authHeader)
 		if err != nil {
 			log.Println("Access Token Validation Error:", err)
 			http.Error(w, "Unauthorized "+err.Error(), http.StatusUnauthorized)

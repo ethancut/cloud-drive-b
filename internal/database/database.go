@@ -41,9 +41,9 @@ func (ds *DataStore) AddUser(username, password, email string) error {
 	return err
 }
 
-func (ds *DataStore) getUser(email string) (int, string, string, error) {
+func (ds *DataStore) getUser(email string) (int64, string, string, error) {
 	var passwordHash, username string
-	var id int
+	var id int64
 	err := ds.db.QueryRow(context.Background(),
 		"SELECT password_hash, id, username FROM users WHERE email = $1",
 		email).Scan(&passwordHash, &id, &username)
@@ -56,7 +56,7 @@ func (ds *DataStore) DeleteUser(email string) error {
 	return err
 }
 
-func (ds *DataStore) Login(email, password string) (int, string, error) {
+func (ds *DataStore) Login(email, password string) (int64, string, error) {
 	userID, passwordHash, username, err := ds.getUser(email)
 	if err != nil {
 		fmt.Println("Error getting user:", err)
