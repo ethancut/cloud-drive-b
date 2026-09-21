@@ -22,7 +22,7 @@ type RegisterRequest struct {
 	RegistrationKey string `json:"registration_key"`
 }
 
-func Register(dataStore *database.DataStore, req RegisterRequest) (*database.TokenPair, string, error) {
+func Register(dataStore *database.DataStore, req RegisterRequest) (*TokenPair, string, error) {
 	var err error
 	log.Printf("user.Register: got credentials: username: %s, email: %s, registration_key: %s", req.Username, req.Email, req.RegistrationKey)
 
@@ -39,7 +39,7 @@ func Register(dataStore *database.DataStore, req RegisterRequest) (*database.Tok
 	return Login(dataStore, req)
 }
 
-func Login(dataStore *database.DataStore, req RegisterRequest) (*database.TokenPair, string, error) {
+func Login(dataStore *database.DataStore, req RegisterRequest) (*TokenPair, string, error) {
 	userID, username, err := dataStore.Login(req.Email, req.Password)
 	if err != nil {
 		log.Println("Login error:", err)
@@ -50,7 +50,7 @@ func Login(dataStore *database.DataStore, req RegisterRequest) (*database.TokenP
 		return nil, "", fmt.Errorf("invalid credentials")
 	}
 
-	tokens, err := database.GenerateTokenPair(userID)
+	tokens, err := GenerateTokenPair(userID)
 	if err != nil {
 		log.Println("JWT generation error:", err)
 		return nil, "", err
@@ -66,7 +66,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 			return
 		}
-		userID, err := database.ValidateAccessToken(authHeader)
+		userID, err := ValidateAccessToken(authHeader)
 		if err != nil {
 			log.Println("Access Token Validation Error:", err)
 			http.Error(w, "Unauthorized "+err.Error(), http.StatusUnauthorized)

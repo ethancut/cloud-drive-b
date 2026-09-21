@@ -1,4 +1,4 @@
-package database
+package auth
 
 import (
 	"crypto/rand"
@@ -19,6 +19,10 @@ type Claims struct {
 	Type   TokenType `json:"type"`
 	jwt.RegisteredClaims
 }
+type TokenPair struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
 
 const (
 	TokenTypeAccess  TokenType = "access"
@@ -28,11 +32,23 @@ const (
 	RefreshTokenExpiry = 7 * 24 * time.Hour // 7 days
 )
 
-type TokenPair struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
+func ValidateAccessToken(authHeader string) (int, error) {
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return -1, errors.New("missing or invalid Bearer token prefix")
+	}
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
+	claims, err := parseToken(tokenString, os.Getenv("JWT_SECRET"))
+	if err != nil {
+		return -1, err
+	}
+
+	if claims.Type != TokenTypeAccess {
+		return -1, errors.New("invalid token type: expected access token")
+	}
+
+	return claims.UserID, nil
+}
 func GenerateTokenPair(userID int) (*TokenPair, error) {
 	accessClaims := Claims{
 		UserID: userID,
@@ -65,29 +81,12 @@ func GenerateTokenPair(userID int) (*TokenPair, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %v", err)
 	}
-	// return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	return &TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
 }
-func ValidateAccessToken(authHeader string) (int, error) {
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return -1, errors.New("missing or invalid Bearer token prefix")
-	}
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-	claims, err := parseToken(tokenString, os.Getenv("JWT_SECRET"))
-	if err != nil {
-		return -1, err
-	}
-
-	if claims.Type != TokenTypeAccess {
-		return -1, errors.New("invalid token type: expected access token")
-	}
-
-	return claims.UserID, nil
-}
 func RefreshAccessToken(authHeader string) (*TokenPair, error) {
 	if !strings.HasPrefix(authHeader, "Bearer ") {
 		return nil, errors.New("missing or invalid Bearer token prefix")

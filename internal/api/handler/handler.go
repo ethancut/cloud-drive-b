@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/ethannself/cloud-drive-b/internal/auth"
-	"github.com/ethannself/cloud-drive-b/internal/database"
 	"github.com/ethannself/cloud-drive-b/internal/storage"
 )
 
@@ -215,7 +214,7 @@ func RefreshTokenhandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 		return
 	}
-	newTokens, err := database.RefreshAccessToken(authHeader)
+	newTokens, err := auth.RefreshAccessToken(authHeader)
 	if err != nil {
 		http.Error(w, "Failed to refresh token: "+err.Error(), http.StatusUnauthorized)
 		return
