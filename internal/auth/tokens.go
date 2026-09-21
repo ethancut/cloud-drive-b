@@ -27,18 +27,20 @@ type TokenPair struct {
 const (
 	TokenTypeAccess  TokenType = "access"
 	TokenTypeRefresh TokenType = "refresh"
-
-	AccessTokenExpiry  = 15 * time.Minute   // 15 min
-	RefreshTokenExpiry = 7 * 24 * time.Hour // 7 days
 )
 
-func ValidateAccessToken(authHeader string) (int, error) {
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return -1, errors.New("missing or invalid Bearer token prefix")
+// helper function that gets the claims from the authHeader and returns it
+func getClaimsFromAuthHeader(authHeader string) (*Claims, error) {
+	claims, err := parseToken(authHeader, os.Getenv("JWT_SECRET"))
+	if err != nil {
+		return nil, err
 	}
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-	claims, err := parseToken(tokenString, os.Getenv("JWT_SECRET"))
+	return claims, nil
+}
+
+func ValidateAccessToken(authHeader string) (int, error) {
+	claims, err := getClaimsFromAuthHeader(authHeader)
 	if err != nil {
 		return -1, err
 	}
@@ -88,15 +90,11 @@ func GenerateTokenPair(userID int) (*TokenPair, error) {
 }
 
 func RefreshAccessToken(authHeader string) (*TokenPair, error) {
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return nil, errors.New("missing or invalid Bearer token prefix")
+	claims, err := getClaimsFromAuthHeader(authHeader)
+	if err != nil {
+		return nil, err
 	}
 	refreshTokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-	claims, err := parseToken(refreshTokenString, os.Getenv("JWT_SECRET"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid refresh token: %w", err)
-	}
 
 	if claims.Type != TokenTypeRefresh {
 		return nil, errors.New("invalid token type: expected refresh token")
@@ -119,21 +117,24 @@ func RefreshAccessToken(authHeader string) (*TokenPair, error) {
 		RefreshToken: refreshTokenString,
 	}, nil
 }
-func RefreshTokens(refreshTokenString string) (*TokenPair, error) {
-	claims, err := parseToken(refreshTokenString, os.Getenv("JWT_SECRET"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid refresh token: %w", err)
-	}
 
-	if claims.Type != TokenTypeRefresh {
-		return nil, errors.New("invalid token type: expected refresh token")
-	}
+// func RefreshTokens(refreshTokenString string) (*TokenPair, error) {
+// 	claims, err := parseToken(refreshTokenString, os.Getenv("JWT_SECRET"))
+// 	if err != nil {
+// 		return nil, fmt.Errorf("invalid refresh token: %w", err)
+// 	}
 
-	// TODO: Check JTI against a revoked token db here
+// 	if claims.Type != TokenTypeRefresh {
+// 		return nil, errors.New("invalid token type: expected refresh token")
+// 	}
 
-	return GenerateTokenPair(claims.UserID)
-}
+// 	// TODO: Check JTI against a revoked token db here
+
+//		return GenerateTokenPair(claims.UserID)
+//	}
 func parseToken(tokenString, secret string) (*Claims, error) {
+	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])

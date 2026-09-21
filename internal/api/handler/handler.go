@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -209,7 +208,6 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 func RefreshTokenhandler(w http.ResponseWriter, r *http.Request) {
 
 	authHeader := r.Header.Get("Authorization")
-	log.Println("auth: ", authHeader)
 	if authHeader == "" {
 		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 		return
