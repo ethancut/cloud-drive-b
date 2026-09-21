@@ -5,17 +5,23 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
+var (
+	ErrInvalidHeader    = errors.New("invalid authorization header format")
+	ErrInvalidTokenType = errors.New("invalid token type")
+	ErrInvalidClaims    = errors.New("invalid or expired token claims")
+	ErrEmptySecret      = errors.New("jwt secret key cannot be empty")
+)
+
 type TokenType string
 
 type Claims struct {
-	UserID int       `json:"user_id"`
+	UserID int64     `json:"user_id"`
 	Type   TokenType `json:"type"`
 	jwt.RegisteredClaims
 }
@@ -46,29 +52,23 @@ func NewTokenService(secretKey string, accessTokenExpiry, refreshTokenExpiry tim
 	}, nil
 }
 
-func ValidateAccessToken(authHeader string) (int, error) {
-	claims, err := getClaimsFromAuthHeader(authHeader)
+func (s *TokenService) ValidateAccessToken(authHeader string) (int64, error) {
+	rawToken, err := extractBearerToken(authHeader)
 	if err != nil {
 		return -1, err
 	}
 
-	if claims.Type != TokenTypeAccess {
-		return -1, errors.New("invalid token type: expected access token")
+	claims, err := s.parseToken(rawToken)
+	if err != nil {
+		return -1, err
 	}
-
+	if claims.Type != TokenTypeAccess {
+		return -1, ErrInvalidTokenType
+	}
 	return claims.UserID, nil
 }
-func GenerateTokenPair(userID int) (*TokenPair, error) {
-	accessClaims := Claims{
-		UserID: userID,
-		Type:   TokenTypeAccess,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(AccessTokenExpiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte(os.Getenv("JWT_SECRET")))
-
+func (s *TokenService) GenerateTokenPair(userID int64) (*TokenPair, error) {
+	accessToken, err := s.generateToken(userID, TokenTypeAccess, s.accessTokenExpiry, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %v", err)
 	}
@@ -77,16 +77,8 @@ func GenerateTokenPair(userID int) (*TokenPair, error) {
 	if _, err := rand.Read(jti); err != nil {
 		return nil, err
 	}
-	refreshClaims := Claims{
-		UserID: userID,
-		Type:   TokenTypeRefresh,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        hex.EncodeToString(jti),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(RefreshTokenExpiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(os.Getenv("JWT_SECRET")))
+
+	refreshToken, err := s.generateToken(userID, TokenTypeRefresh, s.refreshTokenExpiry, hex.EncodeToString(jti))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %v", err)
 	}
@@ -95,58 +87,44 @@ func GenerateTokenPair(userID int) (*TokenPair, error) {
 		RefreshToken: refreshToken,
 	}, nil
 }
-
-func RefreshAccessToken(authHeader string) (*TokenPair, error) {
-	claims, err := getClaimsFromAuthHeader(authHeader)
+func (s *TokenService) RotateRefreshToken(rawRefreshToken string) (*TokenPair, *Claims, error) {
+	claims, err := s.parseToken(rawRefreshToken)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	refreshTokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 	if claims.Type != TokenTypeRefresh {
-		return nil, errors.New("invalid token type: expected refresh token")
+		return nil, nil, fmt.Errorf("%w: expected refresh token", ErrInvalidTokenType)
 	}
-	accessClaims := Claims{
-		UserID: claims.UserID,
-		Type:   TokenTypeAccess,
+
+	pair, err := s.GenerateTokenPair(claims.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pair, claims, nil
+}
+func (s *TokenService) generateToken(userID int64, tokenType TokenType, duration time.Duration, jti string) (string, error) {
+	now := time.Now()
+	claims := Claims{
+		UserID: userID,
+		Type:   tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(AccessTokenExpiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(now.Add(duration)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ID:        jti,
 		},
 	}
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte(os.Getenv("JWT_SECRET")))
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate access token: %v", err)
-	}
-
-	return &TokenPair{
-		AccessToken:  accessToken,
-		RefreshToken: refreshTokenString,
-	}, nil
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(s.secretKey)
 }
 
-// func RefreshTokens(refreshTokenString string) (*TokenPair, error) {
-// 	claims, err := parseToken(refreshTokenString, os.Getenv("JWT_SECRET"))
-// 	if err != nil {
-// 		return nil, fmt.Errorf("invalid refresh token: %w", err)
-// 	}
-
-// 	if claims.Type != TokenTypeRefresh {
-// 		return nil, errors.New("invalid token type: expected refresh token")
-// 	}
-
-// 	// TODO: Check JTI against a revoked token db here
-
-//		return GenerateTokenPair(claims.UserID)
-//	}
-func parseToken(tokenString, secret string) (*Claims, error) {
-	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-
+func (s *TokenService) parseToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return []byte(secret), nil
+		return s.secretKey, nil
 	})
 	if err != nil {
 		return nil, err
@@ -154,8 +132,18 @@ func parseToken(tokenString, secret string) (*Claims, error) {
 
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
-		return nil, errors.New("invalid token claims")
+		return nil, ErrInvalidClaims
 	}
 
 	return claims, nil
+}
+func extractBearerToken(authHeader string) (string, error) {
+	if authHeader == "" {
+		return "", ErrInvalidHeader
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", ErrInvalidHeader
+	}
+	return strings.TrimSpace(parts[1]), nil
 }
