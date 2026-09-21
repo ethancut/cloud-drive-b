@@ -166,15 +166,24 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing filename", http.StatusBadRequest)
 		return
 	}
-	baseDir := filepath.Join("uploads", strconv.Itoa(userID))
-	cleanPath := filepath.Clean(filepath.Join(baseDir, filename))
+	cleanFilename := filepath.Base(filepath.Clean(filename))
 
-	if !strings.HasPrefix(cleanPath, baseDir) {
-		http.Error(w, "invalid file path", http.StatusBadRequest)
+	// reject any filename that tries to traverse directories or is invalid
+	if cleanFilename == "." || cleanFilename == ".." || cleanFilename == "/" || cleanFilename != filename {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+	// double check that the file is within the user's directory
+	baseDir := filepath.Join("uploads", strconv.Itoa(userID))
+	targetPath := filepath.Join(baseDir, cleanFilename)
+	expectedPrefix := filepath.Clean(baseDir) + string(filepath.Separator)
+
+	if !strings.HasPrefix(targetPath, expectedPrefix) {
+		http.Error(w, "Access Denied", http.StatusBadRequest)
 		return
 	}
 
-	file, err := os.Open(cleanPath)
+	file, err := os.Open(targetPath)
 	if err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
@@ -186,9 +195,11 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not stat file", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": cleanFilename}))
 	w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
 
 	http.ServeContent(w, r, filename, stat.ModTime(), file)
