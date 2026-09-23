@@ -1,5 +1,5 @@
 {
-  "name": "cloud_drive",
+  "name": "cloud_drive_v2",
   "tables": [
     {
       "name": "public.users",
@@ -7,9 +7,8 @@
       "columns": [
         {
           "name": "id",
-          "type": "integer",
-          "nullable": false,
-          "default": "nextval('users_id_seq'::regclass)"
+          "type": "uuid",
+          "nullable": false
         },
         {
           "name": "email",
@@ -67,6 +66,94 @@
           ]
         }
       ]
+    },
+    {
+      "name": "public.files",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "original_filename",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "filepath",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "size_bytes",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "files_pkey",
+          "def": "CREATE UNIQUE INDEX files_pkey ON public.files USING btree (id)",
+          "table": "public.files",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_files_user_id",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+          "table": "public.files",
+          "referenced_table": "public.users",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "files_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.files",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "table": "public.files",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.users",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
     }
   ],
   "driver": {

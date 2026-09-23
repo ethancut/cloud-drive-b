@@ -4,7 +4,7 @@
 
 | Name | Type | Default | Nullable | Children | Parents | Comment |
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| id | integer | nextval('users_id_seq'::regclass) | false |  |  |  |
+| id | uuid |  | false | [public.files](public.files.md) |  |  |
 | email | text |  | false |  |  |  |
 | password_hash | text |  | false |  |  |  |
 | username | text |  | true |  |  |  |
