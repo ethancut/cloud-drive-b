@@ -17,8 +17,8 @@ func New(h *handler.Handler) http.Handler {
 	mux.Handle("/api/test-jwt", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.JWTTestHandler)))
 	mux.Handle("/api/files/upload", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.UploadHandler)))
 	mux.Handle("/api/files/list", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.ListFilesHandler)))
-	mux.Handle("/api/files/delete/{filename}", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.DeleteFileHandler)))
-	mux.Handle("/api/files/download/{filename}", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.DownloadFileHandler)))
+	mux.Handle("/api/files/delete/{id}", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.DeleteFileHandler)))
+	mux.Handle("/api/files/download/{id}", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.DownloadFileHandler)))
 	mux.Handle("/api/auth/refresh", http.HandlerFunc(h.RefreshTokenhandler))
 
 	c := cors.New(cors.Options{
