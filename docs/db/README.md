@@ -1,10 +1,11 @@
-# cloud_drive
+# cloud_drive_v2
 
 ## Tables
 
 | Name | Columns | Comment | Type |
 | ---- | ------- | ------- | ---- |
 | [public.users](public.users.md) | 4 |  | BASE TABLE |
+| [public.files](public.files.md) | 6 |  | BASE TABLE |
 
 ## Relations
 

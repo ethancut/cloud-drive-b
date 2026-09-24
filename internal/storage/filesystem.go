@@ -1,58 +1,79 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type File struct {
+	ID       uuid.UUID `json:"id"`
 	Filename string    `json:"filename"`
 	Size     int64     `json:"size"`
 	ModTime  time.Time `json:"modtime"`
 }
 
-func UploadFile(userID int, filename string, file io.Reader) error {
-	dir := fmt.Sprintf("%s%d", os.Getenv("UPLOADS_DIR"), userID)
-	os.MkdirAll(dir, os.ModePerm)
-	dst, err := os.Create(fmt.Sprintf("%s/%s", dir, filename))
+func UploadFile(ctx context.Context, userID uuid.UUID, originalFilename string, file io.Reader) (uuid.UUID, error) {
+	id := uuid.New()
+
+	ext := filepath.Ext(originalFilename)
+	storageFilename := id.String() + ext
+
+	dir := os.Getenv("UPLOADS_DIR")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return uuid.UUID{}, err
+	}
+
+	storagePath := filepath.Join(dir, storageFilename)
+
+	dst, err := os.Create(storagePath)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	defer dst.Close()
-	_, err = io.Copy(dst, file)
-	return err
+
+	written, err := io.Copy(dst, file)
+	if err != nil {
+		os.Remove(storagePath)
+		return uuid.Nil, err
+	}
+
+	ds := GetDataStore()
+
+	if err := ds.AddFile(ctx, id, originalFilename, storagePath, userID, written); err != nil {
+		os.Remove(storagePath)
+		return uuid.Nil, err
+	}
+	return id, nil
 }
 
-func ListFiles(userID int) ([]File, error) {
-	dir := fmt.Sprintf("%s%d", os.Getenv("UPLOADS_DIR"), userID)
-	files := []File{}
-	entries, err := os.ReadDir(dir)
+func ListFiles(ctx context.Context, userID uuid.UUID) ([]File, error) {
+	ds := GetDataStore()
+	filesMetadata, err := ds.GetAllFileMetadata(ctx, userID)
 	if err != nil {
-		return files, err
+		return nil, err
 	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			info, err := entry.Info()
-			if err != nil {
-				continue
-			}
 
-			files = append(files, File{
-				Filename: entry.Name(),
-				Size:     info.Size(),
-				ModTime:  info.ModTime(),
-			})
-		}
+	files := make([]File, 0, len(filesMetadata))
+	for _, entry := range filesMetadata {
+		files = append(files, File{
+			ID:       entry.ID,
+			Filename: entry.OriginalFilename,
+			Size:     entry.SizeBytes,
+			ModTime:  entry.CreatedAt,
+		})
 	}
 	return files, nil
 }
 
 // if successful, returns the absolute path of the file.
-func queryStorage(userID int, fileName string) (string, error) {
-	dir := fmt.Sprintf("%s%d", os.Getenv("UPLOADS_DIR"), userID)
+func queryStorage(userID uuid.UUID, fileName string) (string, error) {
+	dir := fmt.Sprintf("%s%s", os.Getenv("UPLOADS_DIR"), userID)
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -70,12 +91,14 @@ func queryStorage(userID int, fileName string) (string, error) {
 	}
 	return "", fmt.Errorf("file %q not found", fileName)
 }
-func DeleteFile(userID int, fileName string) error {
-	path, err := queryStorage(userID, fileName)
+func DeleteFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) error {
+	ds := GetDataStore()
+
+	path, err := ds.DeleteFileMetadata(ctx, fileID, userID)
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(path); err != nil {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
