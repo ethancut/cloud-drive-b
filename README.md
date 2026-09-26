@@ -5,9 +5,11 @@ A personal Google Drive-style cloud storage app built to explore how file storag
 ## Tech Stack
 
 **[Frontend](https://github.com/ethancut/cloud-drive-f)**
+
 - [Astro](https://astro.build/)
 
 **Backend**
+
 - [Go](https://go.dev/)
 - [pgx](https://github.com/jackc/pgx) - PostgreSQL driver
 - [jwt](https://github.com/golang-jwt/jwt) - authentication
@@ -20,11 +22,15 @@ A personal Google Drive-style cloud storage app built to explore how file storag
 - [Cloud SVG icon](https://www.svgrepo.com/collection/dazzle-line-icons/) - Dazzle Line Icons collection by Dazzle UI
 - [Download SVG icon](https://www.svgrepo.com/author/Solar%20Icons/) - Solar Icons
 
+## DEPENDENCIES
+
+- [libvips](https://www.libvips.org/) 8.14+
 
 ## DEV ENVIROMENT SETUP
- - Ensure you have the latest version of Go installed
- - Run `go mod tidy` to pull all dependencies to the project
- - Set the environment variables (see .env.template)
- - (Recommended) run the dev server using air for hot reload\
+
+- Ensure you have the latest version of Go installed
+- Run `go mod tidy` to pull all dependencies to the project
+- Set the environment variables (see .env.template)
+- (Recommended) run the dev server using air for hot reload\
   (install with `go install github.com/air-verse/air@latest`)
-    - If not using air, just do `go run cmd/api/main.go`
+  - If not using air, just do `go run cmd/api/main.go`
