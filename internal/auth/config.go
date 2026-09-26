@@ -3,6 +3,6 @@ package auth
 import "time"
 
 const (
-	AccessTokenExpiry  = 5 * time.Second    // 15 min
+	AccessTokenExpiry  = 15 * time.Minute   // 15 min
 	RefreshTokenExpiry = 7 * 24 * time.Hour // 7 days
 )

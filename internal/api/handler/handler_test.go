@@ -19,7 +19,7 @@ const testRegKey = "test-registration-key"
 var testHandler *handler.Handler
 
 func TestMain(m *testing.M) {
-	os.Setenv("DATABASE_URL", "postgres://ethan:1@localhost:5432/cloud_drive_test?sslmode=disable")
+	os.Setenv("DATABASE_URL", "postgres://ethan:1@localhost:5432/cloud_drive_v2_test?sslmode=disable")
 	os.Setenv("JWT_SECRET", "test-jwt-key")
 	os.Setenv("REGISTRATION_KEY", testRegKey)
 	storage.InitDataStore()

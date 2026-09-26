@@ -2,16 +2,18 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/ethannself/cloud-drive-b/internal/auth"
 	"github.com/ethannself/cloud-drive-b/internal/storage"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type AuthResponse struct {
@@ -120,11 +122,15 @@ func (h *Handler) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	storage.UploadFile(userID, fileHeader.Filename, file)
+	id, err := storage.UploadFile(r.Context(), userID, fileHeader.Filename, file)
+	if err != nil {
+		http.Error(w, "Failed to upload file", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "uploaded"})
+	json.NewEncoder(w).Encode(map[string]string{"status": "uploaded", "id": id.String()})
 }
 
 func (h *Handler) ListFilesHandler(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +139,7 @@ func (h *Handler) ListFilesHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	files, err := storage.ListFiles(userID)
+	files, err := storage.ListFiles(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Failed to list files", http.StatusInternalServerError)
 		return
@@ -151,12 +157,18 @@ func (h *Handler) DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	filename := r.PathValue("filename")
-	if filename == "" {
-		http.Error(w, "Missing filename", http.StatusBadRequest)
+
+	idStr := r.PathValue("id")
+	fileID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid file id", http.StatusBadRequest)
 		return
 	}
-	if err := storage.DeleteFile(userID, filename); err != nil {
+	if err := storage.DeleteFile(r.Context(), userID, fileID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, "Failed to delete file", http.StatusInternalServerError)
 		return
 	}
@@ -169,27 +181,38 @@ func (h *Handler) DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	filename := r.PathValue("filename")
-	if filename == "" {
-		http.Error(w, "Missing filename", http.StatusBadRequest)
-		return
-	}
-	cleanFilename := filepath.Base(filepath.Clean(filename))
+	idStr := r.PathValue("id")
 
-	// reject any filename that tries to traverse directories or is invalid
-	if cleanFilename == "." || cleanFilename == ".." || cleanFilename == "/" || cleanFilename != filename {
-		http.Error(w, "Invalid filename", http.StatusBadRequest)
+	if idStr == "" {
+		http.Error(w, "Missing file id", http.StatusBadRequest)
 		return
 	}
-	// double check that the file is within the user's directory
-	baseDir := filepath.Join("uploads", strconv.Itoa(userID))
-	targetPath := filepath.Join(baseDir, cleanFilename)
-	expectedPrefix := filepath.Clean(baseDir) + string(filepath.Separator)
+	// reject any id that tries to traverse directories or is invalid
+	if idStr == "." || idStr == ".." || idStr == "/" {
+		http.Error(w, "Invalid file id", http.StatusBadRequest)
+		return
+	}
+	log.Println("Requested file ID:", idStr)
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid file id", http.StatusBadRequest)
+		return
+	}
 
-	if !strings.HasPrefix(targetPath, expectedPrefix) {
-		http.Error(w, "Access Denied", http.StatusBadRequest)
+	db := storage.GetDataStore()
+
+	metadata, err := db.GetFileMetadata(r.Context(), id, userID)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to get file metadata", http.StatusInternalServerError)
 		return
 	}
+
+	targetPath := metadata.FilePath
 
 	file, err := os.Open(targetPath)
 	if err != nil {
@@ -207,11 +230,12 @@ func (h *Handler) DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": cleanFilename}))
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": metadata.OriginalFilename}))
 	w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
 
-	http.ServeContent(w, r, filename, stat.ModTime(), file)
+	http.ServeContent(w, r, metadata.OriginalFilename, stat.ModTime(), file)
 }
+
 func (h *Handler) RefreshTokenhandler(w http.ResponseWriter, r *http.Request) {
 
 	authHeader := r.Header.Get("Authorization")

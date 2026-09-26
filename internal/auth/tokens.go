@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 var (
@@ -21,7 +22,7 @@ var (
 type TokenType string
 
 type Claims struct {
-	UserID int64     `json:"user_id"`
+	UserID uuid.UUID `json:"user_id"`
 	Type   TokenType `json:"type"`
 	jwt.RegisteredClaims
 }
@@ -52,22 +53,22 @@ func NewTokenService(secretKey string, accessTokenExpiry, refreshTokenExpiry tim
 	}, nil
 }
 
-func (s *TokenService) ValidateAccessToken(authHeader string) (int64, error) {
+func (s *TokenService) ValidateAccessToken(authHeader string) (uuid.UUID, error) {
 	rawToken, err := extractBearerToken(authHeader)
 	if err != nil {
-		return -1, err
+		return uuid.Nil, err
 	}
 
 	claims, err := s.parseToken(rawToken)
 	if err != nil {
-		return -1, err
+		return uuid.Nil, err
 	}
 	if claims.Type != TokenTypeAccess {
-		return -1, ErrInvalidTokenType
+		return uuid.Nil, ErrInvalidTokenType
 	}
 	return claims.UserID, nil
 }
-func (s *TokenService) GenerateTokenPair(userID int64) (*TokenPair, error) {
+func (s *TokenService) GenerateTokenPair(userID uuid.UUID) (*TokenPair, error) {
 	accessToken, err := s.generateToken(userID, TokenTypeAccess, s.accessTokenExpiry, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %v", err)
@@ -104,7 +105,7 @@ func (s *TokenService) RotateRefreshToken(rawRefreshToken string) (*TokenPair, *
 
 	return pair, claims, nil
 }
-func (s *TokenService) generateToken(userID int64, tokenType TokenType, duration time.Duration, jti string) (string, error) {
+func (s *TokenService) generateToken(userID uuid.UUID, tokenType TokenType, duration time.Duration, jti string) (string, error) {
 	now := time.Now()
 	claims := Claims{
 		UserID: userID,

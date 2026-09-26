@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/ethannself/cloud-drive-b/internal/database"
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -44,7 +45,7 @@ func Login(ts *TokenService, dataStore *database.DataStore, req RegisterRequest)
 		log.Println("Login error:", err)
 		return nil, "", err
 	}
-	if userID == -1 {
+	if userID == uuid.Nil {
 		log.Println("Login error: invalid credentials")
 		return nil, "", fmt.Errorf("invalid credentials")
 	}
@@ -76,7 +77,7 @@ func JWTMiddleware(ts *TokenService, next http.Handler) http.Handler {
 	})
 }
 
-func GetUserIDFromContext(ctx context.Context) (int, bool) {
-	userID, ok := ctx.Value(UserIDContextKey).(int)
+func GetUserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	userID, ok := ctx.Value(UserIDContextKey).(uuid.UUID)
 	return userID, ok
 }
