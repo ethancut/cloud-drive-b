@@ -8,11 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/ethannself/cloud-drive-b/internal/processing"
-=======
 	"github.com/google/uuid"
->>>>>>> origin/main
 )
 
 type File struct {
@@ -22,14 +19,6 @@ type File struct {
 	ModTime  time.Time `json:"modtime"`
 }
 
-<<<<<<< HEAD
-func UploadFile(userID int, filename string, file io.Reader) error {
-	dir := fmt.Sprintf("%s%d", os.Getenv("UPLOADS_DIR"), userID)
-	os.MkdirAll(dir, os.ModePerm)
-	path := filepath.Join(dir, filename)
-
-	dst, err := os.Create(path)
-=======
 func UploadFile(ctx context.Context, userID uuid.UUID, originalFilename string, file io.Reader) (uuid.UUID, error) {
 	id := uuid.New()
 
@@ -44,20 +33,12 @@ func UploadFile(ctx context.Context, userID uuid.UUID, originalFilename string, 
 	storagePath := filepath.Join(dir, storageFilename)
 
 	dst, err := os.Create(storagePath)
->>>>>>> origin/main
 	if err != nil {
 		return uuid.Nil, err
 	}
 	defer dst.Close()
-<<<<<<< HEAD
-	_, err = io.Copy(dst, file)
-	if err != nil {
-		return err
-	}
 
-	go processing.GeneratePreview(path)
-	return err
-=======
+	go processing.GeneratePreview(storagePath)
 
 	written, err := io.Copy(dst, file)
 	if err != nil {
@@ -72,7 +53,6 @@ func UploadFile(ctx context.Context, userID uuid.UUID, originalFilename string, 
 		return uuid.Nil, err
 	}
 	return id, nil
->>>>>>> origin/main
 }
 
 func ListFiles(ctx context.Context, userID uuid.UUID) ([]File, error) {

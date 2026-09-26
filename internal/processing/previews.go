@@ -10,14 +10,14 @@ import (
 	"github.com/davidbyttow/govips/v2/vips"
 )
 
-var FileNotFoundErr = errors.New("Unsupported or invalid file type for preview generation")
+var UnsupportedFileTypeErr = errors.New("Unsupported or invalid file type for preview generation")
 var PreviewGenerationErr = errors.New("Failed to generate preview")
 var FileWriteErr = errors.New("Failed to write preview file to disk")
 
 func GeneratePreview(imagePath string) {
 	image, err := vips.NewImageFromFile(imagePath)
 	if err != nil {
-		log.Println("")
+		log.Println(UnsupportedFileTypeErr)
 		return
 	}
 	fileName := filepath.Base(imagePath)
