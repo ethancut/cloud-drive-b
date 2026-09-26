@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/ethannself/cloud-drive-b/internal/processing"
 )
 
 type File struct {
@@ -17,12 +19,19 @@ type File struct {
 func UploadFile(userID int, filename string, file io.Reader) error {
 	dir := fmt.Sprintf("%s%d", os.Getenv("UPLOADS_DIR"), userID)
 	os.MkdirAll(dir, os.ModePerm)
-	dst, err := os.Create(fmt.Sprintf("%s/%s", dir, filename))
+	path := filepath.Join(dir, filename)
+
+	dst, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer dst.Close()
 	_, err = io.Copy(dst, file)
+	if err != nil {
+		return err
+	}
+
+	go processing.GeneratePreview(path)
 	return err
 }
 

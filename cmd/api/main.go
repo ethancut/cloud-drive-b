@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/davidbyttow/govips/v2/vips"
 	"github.com/ethannself/cloud-drive-b/internal/api/handler"
 	"github.com/ethannself/cloud-drive-b/internal/auth"
 	"github.com/ethannself/cloud-drive-b/internal/server"
@@ -23,6 +24,9 @@ func main() {
 	if secret == "" {
 		log.Fatal("JWT_SECRET environment variable is not set")
 	}
+
+	vips.Startup(nil)
+	defer vips.Shutdown()
 
 	tokenService, err := auth.NewTokenService(secret, auth.AccessTokenExpiry, auth.RefreshTokenExpiry)
 	if err != nil {
