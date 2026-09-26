@@ -236,14 +236,13 @@ func (h *Handler) DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, metadata.OriginalFilename, stat.ModTime(), file)
 }
 
-func (h *Handler) RefreshTokenhandler(w http.ResponseWriter, r *http.Request) {
-
+func (h *Handler) RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
 		return
 	}
-	newTokens, _, err := h.TokenService.RotateRefreshToken(authHeader)
+	newTokens, _, err := h.TokenService.RotateTokens(authHeader)
 	if err != nil {
 		http.Error(w, "Failed to refresh token: "+err.Error(), http.StatusUnauthorized)
 		return

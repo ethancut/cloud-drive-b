@@ -88,8 +88,14 @@ func (s *TokenService) GenerateTokenPair(userID uuid.UUID) (*TokenPair, error) {
 		RefreshToken: refreshToken,
 	}, nil
 }
-func (s *TokenService) RotateRefreshToken(rawRefreshToken string) (*TokenPair, *Claims, error) {
-	claims, err := s.parseToken(rawRefreshToken)
+func (s *TokenService) RotateTokens(rawRefreshToken string) (*TokenPair, *Claims, error) {
+
+	rawToken, err := extractBearerToken(rawRefreshToken)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	claims, err := s.parseToken(rawToken)
 	if err != nil {
 		return nil, nil, err
 	}
