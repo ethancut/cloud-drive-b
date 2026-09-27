@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -75,26 +74,6 @@ func ListFiles(ctx context.Context, userID uuid.UUID) ([]File, error) {
 	return files, nil
 }
 
-// if successful, returns the absolute path of the file.
-func queryStorage(userID uuid.UUID, fileName string) (string, error) {
-	dir := fmt.Sprintf("%s%s", os.Getenv("UPLOADS_DIR"), userID)
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-
-			if entry.Name() == fileName {
-				absPath := filepath.Join(dir, entry.Name())
-				return absPath, nil
-			}
-
-		}
-	}
-	return "", fmt.Errorf("file %q not found", fileName)
-}
 func DeleteFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) error {
 	ds := GetDataStore()
 
