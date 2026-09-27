@@ -255,3 +255,41 @@ func (h *Handler) RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		RefreshToken: newTokens.RefreshToken,
 	})
 }
+func (h *Handler) GetPreviewHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	fileID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid file id", http.StatusBadRequest)
+		return
+	}
+
+	preview, err := storage.GetPreviewFile(r.Context(), userID, fileID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Preview not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to get preview", http.StatusInternalServerError)
+		return
+	}
+	defer preview.Close()
+
+	stat, err := preview.Stat()
+	if err != nil {
+		http.Error(w, "could not stat preview", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "image/webp")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("Cache-Control", "private, max-age=900")
+	w.Header().Set("Vary", "Authorization")
+
+	http.ServeContent(w, r, "preview.webp", stat.ModTime(), preview)
+}

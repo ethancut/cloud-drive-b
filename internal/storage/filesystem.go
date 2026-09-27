@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ethannself/cloud-drive-b/internal/processing"
@@ -105,4 +106,18 @@ func DeleteFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) error {
 		return err
 	}
 	return nil
+}
+
+func GetPreviewFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) (*os.File, error) {
+	ds := GetDataStore()
+	metadata, err := ds.GetFileMetadata(ctx, fileID, userID)
+	if err != nil {
+		return nil, err
+	}
+	previewPath := strings.TrimSuffix(metadata.FilePath, filepath.Ext(metadata.FilePath)) + "_preview.webp"
+	f, err := os.Open(previewPath)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }

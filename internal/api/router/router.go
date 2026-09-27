@@ -11,7 +11,6 @@ import (
 func New(h *handler.Handler) http.Handler {
 	mux := http.NewServeMux()
 
-	// mux.HandleFunc("/", handler.DefaultHandler)
 	mux.HandleFunc("/api/register", h.RegisterHandler)
 	mux.HandleFunc("/api/login", h.LoginHandler)
 	mux.Handle("/api/test-jwt", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.JWTTestHandler)))
@@ -20,6 +19,7 @@ func New(h *handler.Handler) http.Handler {
 	mux.Handle("/api/files/delete/{id}", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.DeleteFileHandler)))
 	mux.Handle("/api/files/download/{id}", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.DownloadFileHandler)))
 	mux.Handle("/api/auth/refresh", http.HandlerFunc(h.RefreshTokenHandler))
+	mux.Handle("/api/files/preview/{id}", auth.JWTMiddleware(h.TokenService, http.HandlerFunc(h.GetPreviewHandler)))
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"https://cloud.ethann.stream", "http://localhost:4321"},
