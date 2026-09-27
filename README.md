@@ -16,6 +16,8 @@ A personal Google Drive-style cloud storage app built to explore how file storag
 - [bcrypt](https://cs.opensource.google/go/x/crypto) - password hashing
 - [godotenv](https://github.com/joho/godotenv) - environment variables injection
 - [cors](https://github.com/rs/cors) - cross-origin request handling
+- [govips](https://github.com/davidbyttow/govips) - image processing
+- [uuid](https://github.com/google/uuid) - unique identifier generation
 
 ## Credits
 
