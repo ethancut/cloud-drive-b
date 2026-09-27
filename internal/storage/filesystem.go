@@ -77,6 +77,9 @@ func ListFiles(ctx context.Context, userID uuid.UUID) ([]File, error) {
 func DeleteFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) error {
 	ds := GetDataStore()
 
+	if err := deletePreviewFile(ctx, userID, fileID); err != nil {
+		return err
+	}
 	path, err := ds.DeleteFileMetadata(ctx, fileID, userID)
 	if err != nil {
 		return err
@@ -99,4 +102,16 @@ func GetPreviewFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) (*o
 		return nil, err
 	}
 	return f, nil
+}
+func deletePreviewFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) error {
+	ds := GetDataStore()
+	metadata, err := ds.GetFileMetadata(ctx, fileID, userID)
+	if err != nil {
+		return err
+	}
+	previewPath := strings.TrimSuffix(metadata.FilePath, filepath.Ext(metadata.FilePath)) + "_preview.webp"
+	if err := os.Remove(previewPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
