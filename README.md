@@ -21,7 +21,7 @@ A personal Google Drive-style cloud storage app built to explore how file storag
 
 ## Credits
 
-- [Cloud SVG icon](https://www.svgrepo.com/collection/dazzle-line-icons/) - Dazzle Line Icons collection by Dazzle UI
+- [Cloud SVG icon, Pen SVG icon](https://www.svgrepo.com/collection/dazzle-line-icons/) - Dazzle Line Icons collection by Dazzle UI
 - [Download SVG icon](https://www.svgrepo.com/author/Solar%20Icons/) - Solar Icons
 
 ## DEPENDENCIES 

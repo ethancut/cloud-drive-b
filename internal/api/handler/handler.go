@@ -293,3 +293,36 @@ func (h *Handler) GetPreviewHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.ServeContent(w, r, "preview.webp", stat.ModTime(), preview)
 }
+
+func (h *Handler) RenameFileHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	fileID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid file id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Filename string `json:"filename"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
+	err = storage.RenameFile(r.Context(), userID, fileID, req.Filename)
+	if err != nil {
+		http.Error(w, "Failed to rename file", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}

@@ -115,3 +115,13 @@ func deletePreviewFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID) 
 	}
 	return nil
 }
+
+func RenameFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID, newName string) error {
+	ds := GetDataStore()
+
+	err := ds.RenameFile(ctx, userID, fileID, newName)
+	if err != nil {
+		return err
+	}
+	return nil
+}

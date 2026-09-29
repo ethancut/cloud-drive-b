@@ -139,3 +139,13 @@ func (ds *DataStore) DeleteFileMetadata(ctx context.Context, fileID uuid.UUID, u
 		fileID, userID).Scan(&path)
 	return path, err
 }
+
+func (ds *DataStore) RenameFile(ctx context.Context, userID uuid.UUID, fileID uuid.UUID, newName string) error {
+
+	_, err := ds.db.Exec(ctx,
+		`UPDATE files
+		SET original_filename = $1 
+		WHERE id = $2 AND user_id = $3`, newName, fileID, userID)
+
+	return err
+}
