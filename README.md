@@ -24,9 +24,11 @@ A personal Google Drive-style cloud storage app built to explore how file storag
 - [Cloud SVG icon](https://www.svgrepo.com/collection/dazzle-line-icons/) - Dazzle Line Icons collection by Dazzle UI
 - [Download SVG icon](https://www.svgrepo.com/author/Solar%20Icons/) - Solar Icons
 
-## DEPENDENCIES
+## DEPENDENCIES 
 
-- [libvips](https://www.libvips.org/) 8.14+
+- [libvips](https://www.libvips.org/) 8.14+ (on PATH)
+- [pnpm](https://pnpm.io/) 12.6.0+
+- [ffmpeg](https://ffmpeg.org/) 8.0.1+ (on PATH)
 
 ## DEV ENVIROMENT SETUP
 
